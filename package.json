@@ -81,7 +81,7 @@
     "postcss": "^8.5.32",
     "prisma": "^7.10.1",
     "tailwindcss": "^4.3.3",
-    "typescript": "^6",
+    "typescript": "^7",
     "vitest": "^4.1.12"
   },
   "overrides": {
