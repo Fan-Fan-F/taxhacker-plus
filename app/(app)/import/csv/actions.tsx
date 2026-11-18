@@ -3,10 +3,17 @@
 import { ActionState } from "@/lib/actions"
 import { getCurrentUser } from "@/lib/auth"
 import { EXPORT_AND_IMPORT_FIELD_MAP } from "@/models/export_and_import"
-import { createTransaction, findDuplicateTransaction } from "@/models/transactions"
+import { createTransaction, findDuplicateTransaction, updateTransaction } from "@/models/transactions"
 import { Transaction } from "@/prisma/client"
 import { parse } from "@fast-csv/parse"
 import { revalidatePath } from "next/cache"
+
+export type ImportSummaryData = {
+  totalProcessed: number
+  createdCount: number
+  skippedCount: number
+  updatedCount: number
+}
 
 export async function parseCSVAction(
   _prevState: ActionState<string[][]> | null,
@@ -44,17 +51,22 @@ export async function parseCSVAction(
 }
 
 export async function saveTransactionsAction(
-  _prevState: ActionState<Transaction> | null,
+  _prevState: ActionState<ImportSummaryData> | null,
   formData: FormData
-): Promise<ActionState<Transaction>> {
+): Promise<ActionState<ImportSummaryData>> {
   const user = await getCurrentUser()
   try {
     const rows = JSON.parse(formData.get("rows") as string) as Record<string, unknown>[]
 
     const forceSave = formData.get("forceSave") === "true"
+    const duplicateStrategy = (formData.get("duplicateStrategy") as string) || "skip"
     const startIndex = parseInt(formData.get("resumeIndex") as string) || 0
     const rowsToProcess = rows.slice(startIndex)
     let currentIndex = startIndex
+
+    let createdCount = 0
+    let skippedCount = 0
+    let updatedCount = 0
 
     for (const row of rowsToProcess) {
       const transactionData: Record<string, unknown> = {}
@@ -70,30 +82,50 @@ export async function saveTransactionsAction(
       const shouldForceSave = forceSave && currentIndex === startIndex
 
       // --- Deduplication Check ---
-      if (!shouldForceSave) {
+      if (!shouldForceSave && duplicateStrategy !== "keepBoth") {
         const existingTransaction = await findDuplicateTransaction(user.id, transactionData)
 
         if (existingTransaction) {
-          return {
-            success: false,
-            error: "DUPLICATE_FOUND",
-            duplicateData: {
-              existingTransaction: existingTransaction,
-              newTransactionData: transactionData,
-              resumeIndex: currentIndex,
-            },
+          if (duplicateStrategy === "skip") {
+            skippedCount++
+            currentIndex++
+            continue
+          } else if (duplicateStrategy === "overwrite") {
+            await updateTransaction(existingTransaction.id, user.id, transactionData)
+            updatedCount++
+            currentIndex++
+            continue
+          } else if (duplicateStrategy === "prompt") {
+            return {
+              success: false,
+              error: "DUPLICATE_FOUND",
+              duplicateData: {
+                existingTransaction: existingTransaction,
+                newTransactionData: transactionData,
+                resumeIndex: currentIndex,
+              },
+            }
           }
         }
       }
-      await createTransaction(user.id, transactionData)
 
+      await createTransaction(user.id, transactionData)
+      createdCount++
       currentIndex++
     }
 
     revalidatePath("/import/csv")
     revalidatePath("/transactions")
 
-    return { success: true }
+    return {
+      success: true,
+      data: {
+        totalProcessed: rowsToProcess.length,
+        createdCount,
+        skippedCount,
+        updatedCount,
+      },
+    }
   } catch (error) {
     console.error("Error saving transactions:", error)
     return { success: false, error: "Failed to save transactions: " + error }

@@ -1,235 +1,201 @@
-<div align="center"><a name="readme-top"></a>
+<div align="center">
 
-<img src="public/logo/512.png" alt="" width="320">
+# TaxHacker Plus (taxhacker-plus)
 
-<br>
+**专为电商卖家与跨境独立站打造的自托管 AI 票据管理、多平台订单导入与财务对账中心**  
+*Self-hosted AI accounting & invoice parser enhanced with e-commerce multi-platform imports and tax reconciliation auditing.*
 
-# TaxHacker: Self-Hosted AI Accounting
-
-[![GitHub Stars](https://img.shields.io/github/stars/vas3k/TaxHacker?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/vas3k/TaxHacker/stargazers)
-[![License](https://img.shields.io/badge/license-MIT-ffcb47?labelColor=black&style=flat-square)](https://github.com/vas3k/TaxHacker/blob/main/LICENSE)
-[![Support Us](https://img.shields.io/badge/-Donate-f04f88?logo=githubsponsors&logoColor=white&style=flat-square)](https://vas3k.com/donate/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 </div>
 
-> [!NOTE]
-> ☝️ I'm currently looking for a job! Particularly interested in companies in Berlin or remote positions in Germany. Here's [my CV](https://raw.githubusercontent.com/vas3k/vas3k/master/cv.pdf) and [Linkedin profile](https://www.linkedin.com/in/vas3k/). Thank you 🙏
+---
 
-TaxHacker is a self-hosted accounting app designed for freelancers, indie-hackers, and small businesses who want to save time and automate expense and income tracking using the power of modern AI.
+## 🇨🇳 中文说明
 
-Upload photos of receipts, invoices, or PDFs, and TaxHacker will automatically recognize and extract all the important data you need for accounting: product names, amounts, items, dates, merchants, taxes, and save it into a structured Excel-like database. You can even create custom fields with your own AI prompts to extract any specific information you need.
+### 项目简介
 
-The app features automatic currency conversion (including crypto!) based on historical exchange rates from the transaction date. With built-in filtering, multi-project support, import/export capabilities, and custom categories, TaxHacker simplifies reporting and makes tax filing a bit easier.
+**TaxHacker Plus** 是在开源项目 TaxHacker 基础上面向电商卖家、独立站运营者与多平台跨境交易者打造的增强版本。除了原有的 AI 票据智能扫描提取、多币种与加密货币汇率换算、自定义字段与自托管 LLM 支持外，新增了主流电商/支付平台（Shopify、Amazon Seller、Stripe、PayPal）订单报表智能预设映射、批量导入防重复冲突解决策略、金额与时区解析缺陷修复，以及专为报税与审计设计的财务对账与凭证合规导出中心。
 
-> 🎥 [Watch demo video](https://taxhacker.app/landing/video.mp4)
+---
 
-![Dashboard](public/landing/main-page.webp)
+### 功能与改进点（对应 CHANGES.md）
 
-> \[!IMPORTANT]
->
-> This project is still in early development. Use at your own risk! **Star us** to get notified about new features and bugfixes ⭐️
+#### 1. 金额精度、日期时区解析缺陷及构建配置修复（缺陷修复与稳健性）
+- **金额解析漏洞修复**：重写导入数值解析逻辑，支持智能剥离货币符号（`$`、`€`、`£`、`¥` 等）、清理千分位逗号（如 `1,299.00`）、兼容会计括号负数表示法（如 `($25.00)`），并以 `Math.round(val * 100)` 转换为整型分（cents），彻底解决浮点舍入漂移与 NaN 导致金额归零的问题。
+- **日期时区一致性**：统一导入日期解析为 UTC 零点（`T00:00:00.000Z`），消除不同服务器时区或夏令时导致的交易日期提前一天偏移，兼容 ISO 及斜杠日期格式。
+- **导出文件名逻辑纠正**：修复导出无附件数据时下载名为 `transactions.zip` 的文件名逻辑缺陷，纯表格导出下载标准 `.csv` 文件，打包附件时才打包为 `.zip`。
+- **构建过时告警消除**：升级 Vitest 配置中的路径解析为 `import.meta.dirname`，消除 Vite 弃用警告。
 
-## ✨ Features
+#### 2. 电商多平台订单/票据批量导入与智能预设映射（新功能）
+- **多平台内置预设**：开箱即用支持主流电商与支付平台订单报表，包括：
+  - **Shopify 订单与结算报表**（Order ID、Total、Currency、Paid at、Lineitem、Vendor）
+  - **Amazon Seller 亚马逊卖家中心账单**（Order ID、Principal、Date/Time、Marketplace）
+  - **Stripe 交易明细报表**（Charge ID、Amount、Gross/Net、Created UTC）
+  - **PayPal 活动明细报表**（Transaction ID、Gross、Counterparty、Date）
+  - **通用电商标准账单（Standard E-Commerce）**
+- **智能表头识别（Auto-Detect）**：上传 CSV 时自动对列头与特征关键词进行评分匹配，自动选择对应平台并一键完成字段映射。
+- **快速映射可视化**：在导入界面提供清晰的预设选择器与快速映射调整栏。
 
-### `1` Analyze photos and invoices with AI
+#### 3. 批量导入防重复冲突解决策略（功能优化）
+- **冲突策略配置**：在批量导入电商订单与流水时，提供三种灵活策略：
+  - `skip`（跳过重复项）：安全跳过已入库的重复订单，不中断其余订单入库；
+  - `overwrite`（覆盖已有记录）：以新导入的报表数据更新旧记录信息；
+  - `keepBoth`（全部保留）：将全部行作为独立记录保存。
+- **协同去重识别算法**：综合金额、币种、交易日期（全天范围协同）与订单号/商家协同判定。
+- **导入结果看板**：导入完成后即时展示处理总数、新建数、跳过数与更新数的统计面板。
 
-![Currency Conversion](public/landing/ai-scanner-big.webp)
+#### 4. 票据识别与财务对账导出中心（新功能）
+- **对账审计模式（Reconciliation Audit）**：导出界面新增对账模式开关，生成带审计摘要注释头的高级对账 CSV。
+- **凭证合规审计状态分类**：逐笔审计交易是否包含关联票据/发票，标识为「已关联凭证（Receipt Attached）」或「缺失凭证（Missing Receipt）」，统计凭证齐备率。
+- **财务净额轧差与有效汇率**：自动汇总总收入、总支出与净差额（Net Balance），并呈现跨币种折算时的有效汇率。
+- **附件联合打包**：支持在对账模式下连同原始票据文件打包为 `transactions-reconciliation.zip` 下载。
 
-Snap a photo of any receipt or upload an invoice PDF, and TaxHacker will automatically recognize, extract, categorize, and store all the information in a structured database.
+---
 
-- **Upload and organize your docs**: Store multiple documents in "unsorted" until you're ready to process them manually or with AI assistance
-- **AI data extraction**: Use AI to automatically pull key information like dates, amounts, vendors, and line items
-- **Auto-categorization**: Transactions are automatically sorted into relevant categories based on their content
-- **Item splitting**: Extract individual items from invoices and split them into separate transactions when needed
-- **Structured storage**: Everything gets saved in an organized database for easy filtering and retrieval
-- **Choose your LLM**: You can use OpenAI, Google Gemini, or Mistral or even your local LLM (in the self-hosted version). Only you're responsible for the quality and privacy of your data.
+### 快速开始
 
-TaxHacker works with a wide variety of documents, including store receipts, restaurant bills, invoices, bank statements, letters, even handwritten receipts. It handles any language and any currency with ease.
+#### 环境要求
+- Node.js >= 20（推荐 Node.js 22+）
+- PostgreSQL 数据库（或 Docker 运行 PostgreSQL）
 
-### `2` Multi-currency support with automatic conversion (even crypto!)
-
-![Currency Conversion](public/landing/multi-currency.webp)
-
-TaxHacker automatically detects currencies in your documents and converts them to your base currency using historical exchange rates.
-
-- **Foreight currency detection**: Automatically identify the currency used in any document
-- **Historical rates**: Get conversion rates from the actual transaction date
-- **All-world coverage**: Support for 170+ world currencies and 14 popular cryptocurrencies (BTC, ETH, LTC, DOT, and more)
-- **Flexible input**: Manual entry is always available when you need more control
-
-### `3` Use your own LLM: Ollama, LM Studio, vLLM, LocalAI etc
-
-It's compatible with your local LLM OpenAI-compatible API endpoint. Just make sure that your local model is good in OCR tasks, results are not guaranteed :)
-
-![Local LLMs](public/landing/local-llms.webp)
-
-### `4` Organize your transactions using fully customizable categories, projects and fields
-
-![Transactions Table](public/landing/transactions-big.webp)
-
-Adapt TaxHacker to your unique needs with unlimited customization options. Create custom fields, projects, and categories that better suit your specific needs, idustry standards or country.
-
-- **Custom categories and projecst**: Create your own categories and projects to group your transactions in any convenient way
-- **Custom fields**: You can create unlimited number of custom fields to extraxt more information from your invoices (it's like creating extra columns in Excel)
-- **Full-text search**: Search through the actual content of recognized documents
-- **Advanced filtering**: Find exactly what you need with search and filter options
-- **AI-powered extraction**: Write your own prompts to extract any custom information from documents
-- **Bulk operations**: Process multiple documents or transactions at once
-
-### `5` Customize any LLM prompt. Even system ones
-
-![Custom Categories](public/landing/custom-llm.webp)
-
-Take full control of how TaxHacker's AI processes your documents. Write custom AI prompts for fields, categories, and projects, or modify the built-in ones to match your specific needs.
-
-- **Customizable system prompts**: Modify the general prompt template in settings to suit your business
-- **Field or project-specific prompts**: Create custom extraction rules for your industry-specific documents
-- **Full control**: Adjust field extraction priorities and naming conventions to match your workflow
-- **Industry optimization**: Fine-tune the AI to understand your specific type of business documents
-- **Full transparency**: Every aspect of the AI extraction process is under your control and can be changed right in settings
-
-TaxHacker is 100% adaptable and tunable to your unique requirements — whether you need to extract emails, addresses, project codes, or any other custom information from your documents.
-
-### `6` Flexible data filtering and export
-
-![Data Export](public/landing/export.webp)
-
-Once your documents are processed, easily view, filter, and export your complete transaction history exactly how you need it.
-
-- **Advanced filtering**: Filter by date ranges, categories, projects, amounts, and any custom fields
-- **Flexible exports**: Export filtered transactions to CSV with all attached documents included
-- **Tax-ready reports**: Generate comprehensive reports for your accountant or tax advisor
-- **Data portability**: Download complete data archives to migrate to other services—your data stays yours
-
-### `7` Self-hosted mode for data privacy
-
-![Self-hosting](docs/screenshots/exported_archive.png)
-
-Keep complete control over your financial data with local storage and self-hosting options. TaxHacker respects your privacy and gives you full ownership of your information.
-
-- **Home server ready**: Host on your own infrastructure for maximum privacy and control
-- **Docker native**: Simple setup with provided Docker containers and compose files
-- **Data ownership**: Your financial documents never leaves your control
-- **No vendor lock-in**: Export everything and migrate whenever you want
-- **Transparent operations**: Full access to source code and complete operational transparency
-
-## 🛳 Deployment and Self-hosting
-
-TaxHacker can be easily self-hosted on your own infrastructure for complete control over your data and application environment. We provide a [Docker image](./Dockerfile) and [Docker Compose](./docker-compose.yml) setup that makes deployment simple:
-
+#### 1. 安装依赖
 ```bash
-curl -O https://raw.githubusercontent.com/vas3k/TaxHacker/main/docker-compose.yml
-
-docker compose up
-```
-
-The Docker Compose setup includes:
-
-- TaxHacker application container
-- PostgreSQL 17+ database (or connect to your existing database)
-- Automatic database migrations on startup
-- Volume mounts for persistent data storage
-- Production-ready configuration
-- `no-new-privileges` security option on all containers
-
-New Docker images are automatically built and published with every release. You can use specific version tags (e.g., `v1.0.0`) or `latest` for the most recent version.
-
-For advanced setups, you can customize the Docker Compose configuration to fit your infrastructure. The default configuration uses the pre-built image from GitHub Container Registry, but you can also build locally using the provided [Dockerfile](./Dockerfile).
-
-Example custom configuration:
-
-```yaml
-services:
-  app:
-    image: ghcr.io/vas3k/taxhacker:latest
-    ports:
-      - "7331:7331"
-    environment:
-      - SELF_HOSTED_MODE=true
-      - UPLOAD_PATH=/app/data/uploads
-      - DATABASE_URL=postgresql://postgres:postgres@localhost:5432/taxhacker
-    volumes:
-      - ./data:/app/data
-    restart: unless-stopped
-```
-
-### Environment Variables
-
-Configure TaxHacker for your specific needs with these environment variables:
-
-| Variable | Required | Description | Example |
-|----------|----------|-------------|---------|
-| `UPLOAD_PATH` | Yes | Local directory for file uploads and storage | `./data/uploads` |
-| `DATABASE_URL` | Yes | PostgreSQL connection string | `postgresql://user@localhost:5432/taxhacker` |
-| `PORT` | No | Port to run the application on | `7331` (default) |
-| `BASE_URL` | No | Base URL for the application | `http://localhost:7331` |
-| `SELF_HOSTED_MODE` | No | Set to "true" for self-hosting: enables auto-login, custom API keys, and additional features | `true` |
-| `DISABLE_SIGNUP` | No | Disable new user registration on your instance | `false` |
-| `BETTER_AUTH_SECRET` | Recommended | Secret key for authentication and email credential encryption (minimum 16 characters). In self-hosted Docker, TaxHacker auto-generates and persists one in `./data/.better_auth_secret` if unset. | `your-secure-random-key` |
-| `POSTGRES_PASSWORD` | Yes (`docker-compose.build.yml`) | Password for the bundled Postgres when building locally — used in both `POSTGRES_PASSWORD` and `DATABASE_URL` | output of `openssl rand -hex 24` |
-| `POSTGRES_USER` | No (`docker-compose.build.yml`) | Database user (defaults to `postgres`) | `postgres` |
-| `POSTGRES_DB` | No (`docker-compose.build.yml`) | Database name (defaults to `taxhacker`) | `taxhacker` |
-
-
-> 💡 **Need internet access with authentication?** See [docs/self-hosted-public-access.md](docs/self-hosted-public-access.md) for a workaround (yes, it's cursed).
-
-## ⌨️ Local Development
-
-We use:
-
-- **Next.js 15+** for the frontend and API
-- **Prisma** for database models and migrations
-- **PostgreSQL** as the database (PostgreSQL 17+ recommended)
-- **Ghostscript and GraphicsMagick** for PDF processing (install on macOS via `brew install gs graphicsmagick`)
-
-Set up your local development environment:
-
-```bash
-# Clone the repository
-git clone https://github.com/vas3k/TaxHacker.git
-cd TaxHacker
-
-# Install dependencies
 npm install
-
-# Set up environment variables
-cp .env.example .env
-
-# Edit .env with your configuration
-# Make sure to set DATABASE_URL to your PostgreSQL connection string
-# Example: postgresql://user@localhost:5432/taxhacker
-
-# Initialize the database
-npx prisma generate && npx prisma migrate dev
-
-# Start the development server
-npm run dev
 ```
 
-Visit `http://localhost:7331` to see your local TaxHacker instance in action.
-
-For a production build, instead of `npm run dev` use the following commands:
-
+#### 2. 环境配置
+复制环境变量示例文件并配置数据库与密钥：
 ```bash
-# Build the application
-npm run build
-
-# Start the production server
-npm run start
+cp .env.example .env
+```
+主要环境变量：
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/taxhacker"
+BETTER_AUTH_SECRET="your-secure-random-secret-at-least-32-chars"
+BETTER_AUTH_URL="http://localhost:7331"
 ```
 
-## 🤝 Contributing
+#### 3. 数据库初始化
+```bash
+npx prisma migrate deploy
+```
 
-No AI-slop PRs. Please open a new Issue and discuss the details with maintainers before sending new changes.
+#### 4. 运行与构建
+- **开发模式**：
+  ```bash
+  npm run dev
+  ```
+  访问 `http://localhost:7331` 进入应用。
+- **生产构建与运行**：
+  ```bash
+  npm run build
+  npm run start
+  ```
+- **运行单元测试**：
+  ```bash
+  npm run test
+  ```
 
+---
 
+### 来源与致谢
 
-## ❤️ Support the Project
+本项目基于 [TaxHacker](https://github.com/vas3k/TaxHacker) 二次开发，原项目由 vas3k 以 MIT 许可证开源。
 
-If TaxHacker has helped you save time or manage your finances better, consider supporting its development! Your donations help us maintain the project, add new features, and keep it free and open source. Every contribution helps ensure we can keep improving and maintaining this tool for the community: <https://vas3k.com/donate/>
+---
 
-[![Thank the TaxHacker devs](https://img.shields.io/badge/❤️-donate%20to%20Taxhacker%20devs-f08080?labelColor=black&style=for-the-badge)](https://vas3k.com/donate/)
+### 许可证
 
-## 📄 License
+沿用原许可证，全文见根目录 [LICENSE](LICENSE)。
 
-TaxHacker is licensed under the [MIT License](LICENSE).
+---
+
+## 🇬🇧 English Documentation
+
+### Introduction
+
+**TaxHacker Plus** is an enhanced self-hosted accounting and invoice management application built on top of TaxHacker, specifically tailored for e-commerce sellers, DTC merchants, and cross-border businesses. In addition to original capabilities like AI-powered receipt scanning, multi-currency conversions, and custom LLM integration, TaxHacker Plus introduces multi-platform e-commerce CSV presets (Shopify, Amazon Seller, Stripe, PayPal), customizable deduplication conflict resolution, financial precision and timezone bugfixes, and a dedicated Tax & Reconciliation Audit Export center.
+
+---
+
+### Features & Key Enhancements (from CHANGES.md)
+
+1. **Financial Precision, Timezone & Build Bugfixes**
+   - Implemented `parseCurrencyAmount` to strip currency symbols (`$`, `€`, `£`, `¥`), parse commas/decimals, handle accounting parenthesis negatives (`($50)`), and round to integer cents without floating-point drifts.
+   - Fixed timezone offsets by pinning calendar dates to UTC midnight (`T00:00:00.000Z`).
+   - Fixed export filename logic so non-attachment exports download proper `.csv` files rather than `.zip`.
+   - Upgraded Vitest configuration to `import.meta.dirname` to eliminate deprecation warnings.
+
+2. **E-Commerce Multi-Platform Batch Imports & Smart Presets**
+   - Out-of-the-box presets for Shopify Orders, Amazon Seller Central, Stripe Payments, PayPal Activity, and Standard E-Commerce.
+   - Automatic header auto-detection algorithm that detects uploaded CSV platforms and applies column mappings instantly.
+   - Visual mapping controls with quick re-detection.
+
+3. **Batch Import Deduplication & Conflict Resolution**
+   - Configurable conflict strategy: `skip` duplicates, `overwrite` existing records, or `keepBoth`.
+   - Fuzzy multi-field matcher across amounts, date spans, and merchant/order identifiers.
+   - Comprehensive post-import summary panel with processed, created, skipped, and updated metrics.
+
+4. **Financial Reconciliation & Tax Audit Export Center**
+   - Dedicated Reconciliation Audit Mode with structured audit headers (total transactions, compliance rate, total income/expenses, net balance).
+   - Line-item audit status classifying each transaction as `Receipt Attached` or `Missing Receipt`.
+   - Effective exchange rates and multi-currency tracking.
+   - Supports bundling reconciliation CSV with original receipt files into a single zip.
+
+---
+
+### Quick Start
+
+#### Requirements
+- Node.js >= 20 (Node.js 22+ recommended)
+- PostgreSQL database
+
+#### 1. Install Dependencies
+```bash
+npm install
+```
+
+#### 2. Configuration
+Copy and edit your environment variables:
+```bash
+cp .env.example .env
+```
+Key configuration items:
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/taxhacker"
+BETTER_AUTH_SECRET="your-secure-random-secret-at-least-32-chars"
+BETTER_AUTH_URL="http://localhost:7331"
+```
+
+#### 3. Database Migration
+```bash
+npx prisma migrate deploy
+```
+
+#### 4. Run & Build
+- **Development**:
+  ```bash
+  npm run dev
+  ```
+- **Production Build & Start**:
+  ```bash
+  npm run build
+  npm run start
+  ```
+- **Run Tests**:
+  ```bash
+  npm run test
+  ```
+
+---
+
+### Provenance & Acknowledgement
+
+This project is a secondary development based on [TaxHacker](https://github.com/vas3k/TaxHacker), originally developed by [vas3k](https://github.com/vas3k) and open-sourced under the MIT License.
+
+---
+
+### License
+
+Licensed under the MIT License. See [LICENSE](LICENSE) for the full text.

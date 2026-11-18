@@ -19,6 +19,7 @@ import { useProgress } from "@/hooks/use-progress"
 import { useTransactionFilters } from "@/hooks/use-transaction-filters"
 import { Category, Field, Project } from "@/prisma/client"
 import { formatDate } from "date-fns"
+import { FileSpreadsheet, ShieldCheck } from "lucide-react"
 import { useState } from "react"
 
 const deselectedFields = ["text"]
@@ -41,6 +42,7 @@ export function ExportTransactionsDialog({
     fields.map((field) => (deselectedFields.includes(field.code) ? "" : field.code))
   )
   const [includeAttachments, setIncludeAttachments] = useState(true)
+  const [isReconciliationMode, setIsReconciliationMode] = useState(false)
   const { isLoading, startProgress, progress } = useProgress({
     onError: (error) => {
       console.error("Export progress error:", error)
@@ -66,9 +68,19 @@ export function ExportTransactionsDialog({
         projectCode: exportFilters?.projectCode || "",
         fields: exportFields.join(","),
         includeAttachments: includeAttachments.toString(),
+        reconciliation: isReconciliationMode.toString(),
         progressId: progressId || "",
       }).toString()}`
-      await download(exportUrl, "transactions.zip")
+
+      const filename = includeAttachments
+        ? isReconciliationMode
+          ? "transactions-reconciliation.zip"
+          : "transactions.zip"
+        : isReconciliationMode
+          ? "transactions-reconciliation.csv"
+          : "transactions.csv"
+
+      await download(exportUrl, filename)
     } catch (error) {
       console.error("Failed to start export:", error)
     }
@@ -82,7 +94,9 @@ export function ExportTransactionsDialog({
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">Export {total} Transactions</DialogTitle>
-          <DialogDescription>Export selected transactions and files as a CSV file or a ZIP archive</DialogDescription>
+          <DialogDescription>
+            Export selected transactions and receipts as a CSV spreadsheet or ZIP archive
+          </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4">
@@ -137,27 +151,63 @@ export function ExportTransactionsDialog({
 
           <Separator />
 
-          <div className="text-lg font-bold">Fields to be included in CSV</div>
-
-          <div className="grid grid-cols-2 gap-2">
-            {fields.map((field) => (
-              <div key={field.code} className="inline-flex gap-2">
-                <label className="flex items-center gap-1">
-                  <input
-                    type="checkbox"
-                    name={field.code}
-                    checked={exportFields.includes(field.code)}
-                    onChange={(e) =>
-                      setExportFields(
-                        e.target.checked ? [...exportFields, field.code] : exportFields.filter((f) => f !== field.code)
-                      )
-                    }
-                  />
-                  <span>{field.name}</span>
-                </label>
+          {/* Reconciliation Audit Mode Toggle */}
+          <div className="p-3 border rounded-lg bg-muted/40">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 rounded"
+                checked={isReconciliationMode}
+                onChange={(e) => setIsReconciliationMode(e.target.checked)}
+              />
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2 font-semibold text-sm">
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                  Financial Reconciliation & Audit Mode (对账审计模式)
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  Generates an accounting-grade audit report with summary headers, receipt completeness verification,
+                  multi-currency exchange tracking, and income/expense netting.
+                </div>
               </div>
-            ))}
+            </label>
           </div>
+
+          {!isReconciliationMode && (
+            <>
+              <div className="text-lg font-bold">Fields to be included in CSV</div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {fields.map((field) => (
+                  <div key={field.code} className="inline-flex gap-2">
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        name={field.code}
+                        checked={exportFields.includes(field.code)}
+                        onChange={(e) =>
+                          setExportFields(
+                            e.target.checked
+                              ? [...exportFields, field.code]
+                              : exportFields.filter((f) => f !== field.code)
+                          )
+                        }
+                      />
+                      <span>{field.name}</span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {isReconciliationMode && (
+            <div className="text-xs text-muted-foreground bg-accent/40 p-3 rounded-md flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 shrink-0" />
+              <span>Standard audit columns (ID, Date, Name, Merchant, Rates, Receipt Status) will be automatically included.</span>
+            </div>
+          )}
+
           <Separator />
           <div>
             <label className="flex items-center gap-3 text-lg">
@@ -183,7 +233,9 @@ export function ExportTransactionsDialog({
                 : "Exporting..."
               : isDownloading
                 ? "Archive is created. Downloading..."
-                : "Export Transactions"}
+                : isReconciliationMode
+                  ? "Export Reconciliation Audit"
+                  : "Export Transactions"}
           </Button>
         </DialogFooter>
       </DialogContent>

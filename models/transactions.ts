@@ -137,18 +137,34 @@ export const findDuplicateTransaction = async (userId: string, data: Transaction
   const { standard } = await splitTransactionDataExtraFields(data, userId)
   const currencyCode = standard.currencyCode || "USD"
 
-  if (standard.total && standard.merchant && standard.issuedAt) {
-    const existingTransaction = await prisma.transaction.findFirst({
-      where: {
-        userId: userId,
-        total: standard.total,
-        merchant: standard.merchant,
-        issuedAt: standard.issuedAt,
-        currencyCode: currencyCode,
-      },
-    })
+  if (standard.total && (standard.merchant || standard.name) && standard.issuedAt) {
+    const dateObj = standard.issuedAt instanceof Date ? standard.issuedAt : new Date(String(standard.issuedAt))
 
-    return existingTransaction
+    if (!isNaN(dateObj.getTime())) {
+      const startOfDay = new Date(dateObj)
+      startOfDay.setUTCHours(0, 0, 0, 0)
+      const endOfDay = new Date(dateObj)
+      endOfDay.setUTCHours(23, 59, 59, 999)
+
+      const orClauses = []
+      if (standard.merchant) orClauses.push({ merchant: standard.merchant })
+      if (standard.name) orClauses.push({ name: standard.name })
+
+      const existingTransaction = await prisma.transaction.findFirst({
+        where: {
+          userId: userId,
+          total: standard.total,
+          currencyCode: currencyCode,
+          issuedAt: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+          ...(orClauses.length > 0 ? { OR: orClauses } : {}),
+        },
+      })
+
+      return existingTransaction
+    }
   }
 
   return null

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import { parseCurrencyAmount, parseImportDate } from "@/lib/ecommerce-presets"
 import { codeFromName } from "@/lib/utils"
 import { formatDate } from "date-fns"
 import { createCategory, getCategoryByCode } from "./categories"
@@ -36,8 +37,7 @@ export const EXPORT_AND_IMPORT_FIELD_MAP: Record<string, ExportImportFieldSettin
       return value / 100
     },
     import: async function (userId: string, value: string) {
-      const num = parseFloat(value)
-      return isNaN(num) ? 0.0 : num * 100
+      return parseCurrencyAmount(value)
     },
   },
   currencyCode: {
@@ -54,8 +54,7 @@ export const EXPORT_AND_IMPORT_FIELD_MAP: Record<string, ExportImportFieldSettin
       return value / 100
     },
     import: async function (userId: string, value: string) {
-      const num = parseFloat(value)
-      return isNaN(num) ? 0.0 : num * 100
+      return parseCurrencyAmount(value)
     },
   },
   convertedCurrencyCode: {
@@ -121,15 +120,7 @@ export const EXPORT_AND_IMPORT_FIELD_MAP: Record<string, ExportImportFieldSettin
       }
     },
     import: async function (userId: string, value: string) {
-      try {
-        // Date-only strings parse as UTC midnight; append local time to avoid -1 day shift
-        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-          return new Date(value + "T00:00:00")
-        }
-        return new Date(value)
-      } catch (_error) {
-        return null
-      }
+      return parseImportDate(value)
     },
   },
 }
